@@ -25,7 +25,7 @@ const WORLD_WIDTH = 1672;
 const WORLD_HEIGHT = 941;
 
 const PLAYER_SPEED = 230;          // píxeles por segundo
-const CARRIED_ICON_SIZE = 64;
+const CARRIED_ICON_SIZE = 128;
 const MAX_UPDATE_STEP = 0.05;
 const MAX_FRAME_TIME = 0.2;
 
@@ -821,7 +821,7 @@ class Player {
     // Icono del objeto que lleva encima de la cabeza.
     if (this.carrying && this.carrying.image) {
       const radius = CARRIED_ICON_SIZE / 2 + 5;
-      const iconY = Math.max(radius + 1, drawY - CARRIED_ICON_SIZE / 2 - 6);
+      const iconY = Math.max(radius + 1, drawY - CARRIED_ICON_SIZE / 2 - 12);
       const { image, iconWidth, iconHeight } = this.carrying;
 
       ctx.save();

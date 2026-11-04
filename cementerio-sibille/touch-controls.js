@@ -1,4 +1,4 @@
-/* Controles táctiles: adaptador de entrada, sin alterar game.js ni sus mecánicas. */
+/* Controles táctiles: estado independiente del teclado físico. */
 (() => {
   'use strict';
   const controls = document.getElementById('mobile-controls');
@@ -6,17 +6,12 @@
   const held = new Map();
   const buttons = controls.querySelectorAll('[data-key]');
 
-  function send(key, down) {
-    window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', {
-      key, bubbles: true, cancelable: true
-    }));
-  }
   function release(button) {
     const pointerId = held.get(button);
     if (pointerId === undefined) return;
     held.delete(button);
     button.classList.remove('pressed');
-    send(button.dataset.key, false);
+    window.cemeteryGame?.touchKeys.delete(button.dataset.key);
     if (button.hasPointerCapture(pointerId)) button.releasePointerCapture(pointerId);
   }
   function releaseAll() { buttons.forEach(release); }
@@ -25,14 +20,17 @@
     button.addEventListener('pointerdown', (event) => {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       event.preventDefault();
-      if (held.has(button)) return;
+      const game = window.cemeteryGame;
+      if (!game?.ready || game.won || held.has(button)) return;
       held.set(button, event.pointerId);
       button.setPointerCapture(event.pointerId);
       button.classList.add('pressed');
-      send(button.dataset.key, true);
+      game.touchKeys.add(button.dataset.key);
     });
     for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-      button.addEventListener(type, () => release(button));
+      button.addEventListener(type, (event) => {
+        if (held.get(button) === event.pointerId) release(button);
+      });
     }
     button.addEventListener('contextmenu', event => event.preventDefault());
   });

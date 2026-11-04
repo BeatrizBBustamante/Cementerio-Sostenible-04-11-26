@@ -88,6 +88,40 @@ html, body {
   text-shadow: 0 0 8px rgba(255, 230, 150, 0.35);
 }
 
+#game-hint {
+  position: absolute;
+  left: 50%;
+  bottom: max(8px, 1.5%);
+  transform: translateX(-50%);
+  z-index: 20;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 4px 8px;
+  border: 1px solid #6b6142;
+  border-radius: 6px;
+  background: rgba(20, 18, 12, .92);
+  color: #f3e9c9;
+  font: 600 clamp(11px, 1.3vw, 15px)/1.25 'Cinzel', serif;
+  text-align: center;
+  pointer-events: none;
+}
+
+@media (pointer: coarse) and (orientation: portrait) {
+  #game-stage { margin-bottom: 27px; }
+  #game-hint { top: calc(100% + 6px); bottom: auto; }
+}
+
+@media (pointer: coarse) and (orientation: landscape) {
+  #game-hint {
+    top: calc(max(7px, env(safe-area-inset-top)) + 40px);
+    bottom: auto;
+  }
+}
+
+@media (pointer: coarse) and (orientation: landscape) and (min-width: 540px) {
+  #game-hint { top: max(7px, env(safe-area-inset-top)); }
+}
+
 /* ---------------- Loading screen ---------------- */
 
 #loading-screen {
@@ -512,10 +546,14 @@ html, body {
     overflow:hidden; position:relative;
   }
   #game-canvas {
-    position:absolute; left:0; top:0;
-    width:100%; height:auto;
+    position:absolute; left:50%; top:0;
+    width:auto; height:100%;
     max-width:none; max-height:none;
     box-shadow:none;
+    transform:translateX(-50%);
+  }
+  #game-canvas.camera-crop {
+    left:0; width:100%; height:auto;
     transform:translate3d(0,var(--camera-y,0px),0);
     will-change:transform;
   }

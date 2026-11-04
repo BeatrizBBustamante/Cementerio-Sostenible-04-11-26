@@ -25,6 +25,9 @@ const WORLD_WIDTH = 1672;
 const WORLD_HEIGHT = 941;
 
 const PLAYER_SPEED = 230;          // píxeles por segundo
+const CARRIED_ICON_SIZE = 96;
+const MAX_UPDATE_STEP = 0.05;
+const MAX_FRAME_TIME = 0.2;
 
 // PLAYER_SCALE y los anchors dependen del recorte real del personaje
 // DENTRO de cada celda del spritesheet, no del tamaño de celda en sí.
@@ -494,15 +497,14 @@ class Obstacle {
 
     // Punto usado para el ordenado por profundidad (Y de los pies del objeto).
     this.sortY = y + h;
+    if (image) this.cacheShadow();
   }
 
   collidesWithCircle(cx, cy, radius) {
     return Collision.circleRect(cx, cy, radius, this.collisionRect);
   }
 
-  draw(ctx) {
-    if (!this.image) return;
-
+  cacheShadow() {
     // Sombra apoyada sobre la misma base (collisionRect) que ya se usa
     // para las colisiones, así el tamaño se ajusta solo a cada lápida,
     // cruz o cubo sin necesidad de nuevas constantes por objeto.
@@ -510,8 +512,20 @@ class Obstacle {
     const ry = this.collisionRect.h * 0.32;
     const cx = this.collisionRect.x + this.collisionRect.w / 2;
     const cy = this.collisionRect.y + this.collisionRect.h * 0.85;
-    drawShadow(ctx, cx, cy, rx, ry);
+    // Margen para conservar la cola del desenfoque en un lienzo pequeño.
+    const padding = 8;
+    this.shadowX = Math.floor(cx + SHADOW_OFFSET_X - rx) - padding;
+    this.shadowY = Math.floor(cy + SHADOW_OFFSET_Y - ry) - padding;
+    this.shadow = document.createElement('canvas');
+    this.shadow.width = Math.ceil(cx + SHADOW_OFFSET_X + rx) - this.shadowX + padding;
+    this.shadow.height = Math.ceil(cy + SHADOW_OFFSET_Y + ry) - this.shadowY + padding;
+    drawShadow(this.shadow.getContext('2d'), cx - this.shadowX, cy - this.shadowY, rx, ry);
+  }
 
+  draw(ctx) {
+    if (!this.image) return;
+
+    ctx.drawImage(this.shadow, this.shadowX, this.shadowY);
     ctx.drawImage(this.image, this.x, this.y, this.w, this.h);
   }
 }
@@ -727,6 +741,7 @@ class Player {
 
   tryMove(dx, dy, obstacles, dt) {
     this.moving = (dx !== 0 || dy !== 0);
+    if (!this.moving) return;
 
     if (dx !== 0 && dy !== 0) {
       const inv = 1 / Math.sqrt(2);
@@ -805,19 +820,19 @@ class Player {
 
     // Icono del objeto que lleva encima de la cabeza.
     if (this.carrying && this.carrying.image) {
-      const iconSize = 28;
-      const iconX = this.x - iconSize / 2;
-      const iconY = drawY - iconSize - 6;
+      const radius = CARRIED_ICON_SIZE / 2 + 5;
+      const iconY = Math.max(radius + 1, drawY - CARRIED_ICON_SIZE / 2 - 9);
+      const { image, iconWidth, iconHeight } = this.carrying;
 
       ctx.save();
       ctx.fillStyle = 'rgba(20, 18, 12, 0.55)';
       ctx.beginPath();
-      ctx.ellipse(this.x, iconY + iconSize / 2, iconSize / 2 + 5, iconSize / 2 + 5, 0, 0, Math.PI * 2);
+      ctx.ellipse(this.x, iconY, radius, radius, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = 'rgba(230, 220, 180, 0.8)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.drawImage(this.carrying.image, iconX, iconY, iconSize, iconSize);
+      ctx.drawImage(image, this.x - iconWidth / 2, iconY - iconHeight / 2, iconWidth, iconHeight);
       ctx.restore();
     }
   }
@@ -1170,7 +1185,8 @@ class Game {
 
     this.ready = false;
     this.keys = new Set();
-    this.lastTime = 0;
+    this.touchKeys = new Set();
+    this.lastTime = null;
 
     this.obstacles = [];
     this.bins = [];
@@ -1184,6 +1200,7 @@ class Game {
 
     this.hudTrashEl = document.getElementById('hud-trash-value');
     this.hudScoreEl = document.getElementById('hud-score-value');
+    this.hintEl = document.getElementById('game-hint');
     this.loadingScreen = document.getElementById('loading-screen');
     this.loadingBar = document.getElementById('loading-bar-fill');
     this.loadingText = document.getElementById('loading-text');
@@ -1246,6 +1263,12 @@ class Game {
         e.preventDefault();
         this.keys.delete(key);
       }
+    });
+
+    window.addEventListener('blur', () => this.keys.clear());
+    document.addEventListener('visibilitychange', () => {
+      this.lastTime = null;
+      if (document.hidden) this.keys.clear();
     });
   }
 
@@ -1332,21 +1355,37 @@ class Game {
   }
 
   restart() {
+    const wasWon = this.won;
     this.score = 0;
     this.won = false;
     this.effects = [];
     this.endScreen.classList.add('hidden');
     this.setupWorld();
+    if (wasWon) {
+      this.lastTime = null;
+      requestAnimationFrame(this.loop);
+    }
   }
 
   loop(timestamp) {
-    const dt = Math.min(0.05, (timestamp - this.lastTime) / 1000 || 0);
-    this.lastTime = timestamp;
+    if (document.hidden) {
+      this.lastTime = null;
+      requestAnimationFrame(this.loop);
+      return;
+    }
 
-    this.update(dt);
+    const elapsed = this.lastTime === null ? 0 : (timestamp - this.lastTime) / 1000;
+    this.lastTime = timestamp;
+    // Recupera fotogramas largos sin aumentar el desplazamiento máximo
+    // por comprobación de colisión ni recuperar pausas completas.
+    const frameTime = Math.min(elapsed, MAX_FRAME_TIME);
+    const steps = Math.ceil(frameTime / MAX_UPDATE_STEP);
+    for (let step = 0; step < steps && !this.won; step++) {
+      this.update(frameTime / steps);
+    }
     this.render();
 
-    requestAnimationFrame(this.loop);
+    if (!this.won) requestAnimationFrame(this.loop);
   }
 
   update(dt) {
@@ -1354,10 +1393,10 @@ class Game {
 
     let dx = 0;
     let dy = 0;
-    if (this.keys.has('w') || this.keys.has('arrowup')) dy -= 1;
-    if (this.keys.has('s') || this.keys.has('arrowdown')) dy += 1;
-    if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;
-    if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
+    if (this.keys.has('w') || this.keys.has('arrowup') || this.touchKeys.has('arrowup')) dy -= 1;
+    if (this.keys.has('s') || this.keys.has('arrowdown') || this.touchKeys.has('arrowdown')) dy += 1;
+    if (this.keys.has('a') || this.keys.has('arrowleft') || this.touchKeys.has('arrowleft')) dx -= 1;
+    if (this.keys.has('d') || this.keys.has('arrowright') || this.touchKeys.has('arrowright')) dx += 1;
 
     this.player.tryMove(dx, dy, this.obstacles, dt);
     this.player.updateAnimation(dt);
@@ -1382,7 +1421,14 @@ class Game {
       const d = Collision.distance(this.player.x, this.player.y, item.x, item.y);
       if (d < PICKUP_RADIUS) {
         item.collected = true;
-        this.player.carrying = { type: item.type, image: item.image };
+        const iconScale = CARRIED_ICON_SIZE / Math.max(item.w, item.h);
+        this.player.carrying = {
+          type: item.type,
+          image: item.image,
+          iconWidth: item.w * iconScale,
+          iconHeight: item.h * iconScale,
+        };
+        this.updateHint();
         break;
       }
     }
@@ -1489,6 +1535,7 @@ class Game {
 
   win() {
     this.won = true;
+    this.updateHint();
     this.endScoreEl.textContent = `Puntuación final: ${this.score}`;
     this.endScreen.classList.remove('hidden');
   }
@@ -1496,6 +1543,16 @@ class Game {
   updateHUD() {
     this.hudTrashEl.textContent = this.trashRemaining;
     this.hudScoreEl.textContent = this.score;
+    this.updateHint();
+  }
+
+  updateHint() {
+    const message = this.won || this.trashRemaining === 0 ? '' : this.player.carrying
+      ? 'Tíralo en el cubo correspondiente'
+      : 'Recoge algo de basura';
+    if (this.hintEl.textContent === message) return;
+    this.hintEl.textContent = message;
+    this.hintEl.classList.toggle('hidden', !message);
   }
 
   render() {
@@ -1509,24 +1566,15 @@ class Game {
 
     if (!this.ready) return;
 
-    // Lista de entidades ordenadas por profundidad (coordenada Y).
-    // Se reutiliza el mismo array en cada frame (sólo se vacía con
-    // length = 0, lo que no libera su capacidad interna) y se guardan
-    // referencias directas a los objetos: Obstacle, Item y Player
-    // comparten la firma draw(ctx), así que no hace falta envolverlos en
-    // funciones flecha nuevas cada vez. Antes esto asignaba un array y
-    // hasta ~20 closures nuevas 60 veces por segundo, generando basura
-    // de forma constante durante toda la partida.
+    // Los residuos del suelo quedan detrás de los personajes.
+    for (const item of this.items) item.draw(ctx);
+
+    // Reutiliza la lista ordenada por profundidad para obstáculos y personajes.
     const renderList = this.renderList;
     renderList.length = 0;
 
     for (const obstacle of this.obstacles) {
       renderList.push(obstacle);
-    }
-
-    for (const item of this.items) {
-      if (item.collected) continue;
-      renderList.push(item);
     }
 
     renderList.push(this.player);

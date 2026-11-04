@@ -25,7 +25,7 @@ const WORLD_WIDTH = 1672;
 const WORLD_HEIGHT = 941;
 
 const PLAYER_SPEED = 230;          // píxeles por segundo
-const CARRIED_ICON_SIZE = 42;
+const CARRIED_ICON_SIZE = 64;
 const MAX_UPDATE_STEP = 0.05;
 const MAX_FRAME_TIME = 0.2;
 

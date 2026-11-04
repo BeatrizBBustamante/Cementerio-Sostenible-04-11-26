@@ -5,45 +5,50 @@
   const canvas = document.getElementById('game-canvas');
   const fullBtn = document.getElementById('fullscreen-button');
   const mobile = matchMedia('(pointer: coarse)');
+  const landscape = matchMedia('(orientation: landscape)');
   let camera = 0;
-  function update() {
-    if (mobile.matches && matchMedia('(orientation: landscape)').matches) {
-      const vh = stage.clientHeight;
-      const w = stage.clientWidth;
-      const imageHeight = w * 941 / 1672;
-      if (imageHeight > vh) {
-        const maxCrop = imageHeight - vh;
-        const playerY = window.cemeteryGame?.player?.y ?? 941 / 2;
-        const target = Math.max(0, Math.min(maxCrop, playerY / 941 * imageHeight - vh * .52));
-        camera += (target - camera) * .18;
-        canvas.style.transform = '';
-        canvas.style.width = '100%';
-        canvas.style.height = 'auto';
-        canvas.style.left = '0';
-        canvas.style.top = '0';
-        stage.style.setProperty('--camera-y', `${-camera.toFixed(2)}px`);
-      } else {
-        // Dispositivos de proporción 16:9 o menos anchos: mostrar todo el mapa.
-        camera = 0;
-        canvas.style.width = 'auto';
-        canvas.style.height = '100%';
-        canvas.style.left = '50%';
-        canvas.style.top = '0';
-        canvas.style.transform = 'translateX(-50%)';
-        stage.style.removeProperty('--camera-y');
-      }
-    } else {
-      camera = 0;
-      canvas.style.width = '';
-      canvas.style.height = '';
-      canvas.style.left = '';
-      canvas.style.top = '';
-      canvas.style.transform = '';
-      stage.style.removeProperty('--camera-y');
+  let height = 0;
+  let imageHeight = 0;
+  let frame = null;
+  let lastTime = null;
+
+  function update(timestamp) {
+    const maxCrop = imageHeight - height;
+    const playerY = window.cemeteryGame?.player?.y ?? canvas.height / 2;
+    const target = Math.max(0, Math.min(maxCrop, playerY / canvas.height * imageHeight - height * .52));
+    const elapsed = lastTime === null ? 1000 / 60 : Math.min(50, timestamp - lastTime);
+    lastTime = timestamp;
+    const next = Math.abs(target - camera) < .1
+      ? target
+      : camera + (target - camera) * (1 - Math.pow(.82, elapsed * .06));
+    if (next !== camera) {
+      camera = next;
+      canvas.style.setProperty('--camera-y', `${-camera.toFixed(2)}px`);
     }
-    requestAnimationFrame(update);
+    frame = requestAnimationFrame(update);
   }
-  requestAnimationFrame(update);
+
+  function resize() {
+    height = stage.clientHeight;
+    imageHeight = stage.clientWidth * canvas.height / canvas.width;
+    const cropped = mobile.matches && landscape.matches && imageHeight > height;
+    canvas.classList.toggle('camera-crop', cropped);
+    if (cropped) {
+      if (frame === null) frame = requestAnimationFrame(update);
+    } else {
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = lastTime = null;
+      camera = 0;
+      canvas.style.removeProperty('--camera-y');
+    }
+  }
+
+  new ResizeObserver(resize).observe(stage);
+  for (const query of [mobile, landscape]) {
+    if (query.addEventListener) query.addEventListener('change', resize);
+    else query.addListener(resize);
+  }
+  resize();
   if (fullBtn) {
     fullBtn.addEventListener('click', async () => {
       try {

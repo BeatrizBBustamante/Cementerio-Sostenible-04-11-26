@@ -512,10 +512,14 @@ html, body {
     overflow:hidden; position:relative;
   }
   #game-canvas {
-    position:absolute; left:0; top:0;
-    width:100%; height:auto;
+    position:absolute; left:50%; top:0;
+    width:auto; height:100%;
     max-width:none; max-height:none;
     box-shadow:none;
+    transform:translateX(-50%);
+  }
+  #game-canvas.camera-crop {
+    left:0; width:100%; height:auto;
     transform:translate3d(0,var(--camera-y,0px),0);
     will-change:transform;
   }

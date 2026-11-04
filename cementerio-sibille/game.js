@@ -25,6 +25,8 @@ const WORLD_WIDTH = 1672;
 const WORLD_HEIGHT = 941;
 
 const PLAYER_SPEED = 230;          // píxeles por segundo
+const MAX_UPDATE_STEP = 0.05;
+const MAX_FRAME_TIME = 0.2;
 
 // PLAYER_SCALE y los anchors dependen del recorte real del personaje
 // DENTRO de cada celda del spritesheet, no del tamaño de celda en sí.
@@ -494,15 +496,14 @@ class Obstacle {
 
     // Punto usado para el ordenado por profundidad (Y de los pies del objeto).
     this.sortY = y + h;
+    if (image) this.cacheShadow();
   }
 
   collidesWithCircle(cx, cy, radius) {
     return Collision.circleRect(cx, cy, radius, this.collisionRect);
   }
 
-  draw(ctx) {
-    if (!this.image) return;
-
+  cacheShadow() {
     // Sombra apoyada sobre la misma base (collisionRect) que ya se usa
     // para las colisiones, así el tamaño se ajusta solo a cada lápida,
     // cruz o cubo sin necesidad de nuevas constantes por objeto.
@@ -510,8 +511,20 @@ class Obstacle {
     const ry = this.collisionRect.h * 0.32;
     const cx = this.collisionRect.x + this.collisionRect.w / 2;
     const cy = this.collisionRect.y + this.collisionRect.h * 0.85;
-    drawShadow(ctx, cx, cy, rx, ry);
+    // Margen para conservar la cola del desenfoque en un lienzo pequeño.
+    const padding = 8;
+    this.shadowX = Math.floor(cx + SHADOW_OFFSET_X - rx) - padding;
+    this.shadowY = Math.floor(cy + SHADOW_OFFSET_Y - ry) - padding;
+    this.shadow = document.createElement('canvas');
+    this.shadow.width = Math.ceil(cx + SHADOW_OFFSET_X + rx) - this.shadowX + padding;
+    this.shadow.height = Math.ceil(cy + SHADOW_OFFSET_Y + ry) - this.shadowY + padding;
+    drawShadow(this.shadow.getContext('2d'), cx - this.shadowX, cy - this.shadowY, rx, ry);
+  }
 
+  draw(ctx) {
+    if (!this.image) return;
+
+    ctx.drawImage(this.shadow, this.shadowX, this.shadowY);
     ctx.drawImage(this.image, this.x, this.y, this.w, this.h);
   }
 }
@@ -727,6 +740,7 @@ class Player {
 
   tryMove(dx, dy, obstacles, dt) {
     this.moving = (dx !== 0 || dy !== 0);
+    if (!this.moving) return;
 
     if (dx !== 0 && dy !== 0) {
       const inv = 1 / Math.sqrt(2);
@@ -1170,7 +1184,8 @@ class Game {
 
     this.ready = false;
     this.keys = new Set();
-    this.lastTime = 0;
+    this.touchKeys = new Set();
+    this.lastTime = null;
 
     this.obstacles = [];
     this.bins = [];
@@ -1246,6 +1261,12 @@ class Game {
         e.preventDefault();
         this.keys.delete(key);
       }
+    });
+
+    window.addEventListener('blur', () => this.keys.clear());
+    document.addEventListener('visibilitychange', () => {
+      this.lastTime = null;
+      if (document.hidden) this.keys.clear();
     });
   }
 
@@ -1332,21 +1353,37 @@ class Game {
   }
 
   restart() {
+    const wasWon = this.won;
     this.score = 0;
     this.won = false;
     this.effects = [];
     this.endScreen.classList.add('hidden');
     this.setupWorld();
+    if (wasWon) {
+      this.lastTime = null;
+      requestAnimationFrame(this.loop);
+    }
   }
 
   loop(timestamp) {
-    const dt = Math.min(0.05, (timestamp - this.lastTime) / 1000 || 0);
-    this.lastTime = timestamp;
+    if (document.hidden) {
+      this.lastTime = null;
+      requestAnimationFrame(this.loop);
+      return;
+    }
 
-    this.update(dt);
+    const elapsed = this.lastTime === null ? 0 : (timestamp - this.lastTime) / 1000;
+    this.lastTime = timestamp;
+    // Recupera fotogramas largos sin aumentar el desplazamiento máximo
+    // por comprobación de colisión ni recuperar pausas completas.
+    const frameTime = Math.min(elapsed, MAX_FRAME_TIME);
+    const steps = Math.ceil(frameTime / MAX_UPDATE_STEP);
+    for (let step = 0; step < steps && !this.won; step++) {
+      this.update(frameTime / steps);
+    }
     this.render();
 
-    requestAnimationFrame(this.loop);
+    if (!this.won) requestAnimationFrame(this.loop);
   }
 
   update(dt) {
@@ -1354,10 +1391,10 @@ class Game {
 
     let dx = 0;
     let dy = 0;
-    if (this.keys.has('w') || this.keys.has('arrowup')) dy -= 1;
-    if (this.keys.has('s') || this.keys.has('arrowdown')) dy += 1;
-    if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;
-    if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
+    if (this.keys.has('w') || this.keys.has('arrowup') || this.touchKeys.has('arrowup')) dy -= 1;
+    if (this.keys.has('s') || this.keys.has('arrowdown') || this.touchKeys.has('arrowdown')) dy += 1;
+    if (this.keys.has('a') || this.keys.has('arrowleft') || this.touchKeys.has('arrowleft')) dx -= 1;
+    if (this.keys.has('d') || this.keys.has('arrowright') || this.touchKeys.has('arrowright')) dx += 1;
 
     this.player.tryMove(dx, dy, this.obstacles, dt);
     this.player.updateAnimation(dt);

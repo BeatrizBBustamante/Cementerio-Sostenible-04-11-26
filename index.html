@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>La entrada de los personajes</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -192,6 +192,20 @@
   }
   .calib-panel button.primary{ background:var(--candle); color:#241a12; border-color:transparent; }
   .calib-panel .hint{ opacity:.75; }
+
+  /* Pantalla completa real: disponible a lo largo de TODAS las escenas. */
+  #fullscreen-story {
+    position:fixed; z-index:100; right:max(10px, env(safe-area-inset-right));
+    bottom:max(10px, env(safe-area-inset-bottom));
+    border:1px solid rgba(236,227,208,.55); border-radius:9px;
+    color:var(--bone); background:rgba(14,10,19,.8);
+    font:600 12px 'Special Elite',serif; padding:10px 12px;
+    cursor:pointer; touch-action:manipulation;
+  }
+  #fullscreen-story:focus-visible {outline:2px solid var(--candle);outline-offset:3px}
+  :fullscreen #fullscreen-story {opacity:.5}
+  @media (pointer:fine) {#fullscreen-story {opacity:.4}}
+  @media (pointer:coarse) {#fullscreen-story {font-size:11px;padding:8px}}
 
   /* ---------- PANTALLA 2: ELECCIÓN ---------- */
   #s-eleccion{
@@ -491,9 +505,45 @@
   @media (prefers-reduced-motion: reduce){
     .cartel-card, .cartel-actions{ animation:none !important; opacity:1; transform:none; }
   }
+
+  /* Ajustes de interfaz para teléfonos; las hitboxes de los vídeos conservan
+     sus coordenadas porcentuales originales dentro del escenario. */
+  @media (max-width: 600px){
+    .veil{ width:100%; padding:12px; gap:clamp(12px,3dvh,26px); }
+    .question{ font-size:clamp(22px,6vw,38px); max-width:95vw; }
+    .choices{ gap:12px; }
+    .plate{ width:min(43vw,210px); min-height:82px; padding:12px 9px; font-size:clamp(13px,3.4vw,18px); }
+    .choice-label{ font-size:11px; margin-bottom:4px; }
+    .cartel-wrap{ padding:10px; gap:20px; }
+    .cartel-card{ max-width:94vw; padding:18px 14px; }
+    .cartel-text{ font-size:clamp(14px,3.8vw,19px); line-height:1.35; }
+    .cartel-actions{ gap:8px; }
+    .post-btn{ font-size:clamp(11px,3vw,15px); padding:10px 13px; }
+    .post-video-actions{ bottom:3%; width:95%; }
+    .mando-eleccion .question{ font-size:clamp(16px,4.3vw,31px); }
+  }
+  @media (max-height: 450px) and (orientation: landscape){
+    .veil{ gap:8px; padding:8px; }
+    .question{ font-size:clamp(20px,5dvh,30px); }
+    .plate{ min-height:68px; padding:8px 10px; }
+    .cartel-card{ padding:12px 18px; }
+    .cartel-text{ font-size:clamp(14px,3.5dvh,20px); }
+    .cartel-wrap{ gap:10px; }
+  }
+
+  /* El juego se ejecuta sin abandonar este documento, conservando la pantalla completa. */
+  #s-minijuego { background:#050604; }
+  #cementerio-frame {
+    display:block; border:0; width:100%; height:100%; height:100dvh;
+    background:#050604;
+  }
+  /* Durante el minijuego manda la interfaz del juego, no tapar sus controles. */
+  body:has(#s-minijuego.active) #fullscreen-story { display:none; }
 </style>
 </head>
 <body>
+
+  <button type="button" id="fullscreen-story" aria-label="Activar pantalla completa" title="Pantalla completa">⛶ Pantalla completa</button>
 
   <!-- PANTALLA 1 · PORTADA -->
   <section class="screen active" id="s-portada">
@@ -588,6 +638,11 @@
     </div>
   </section>
 
+  <!-- El minijuego vive en esta misma página: no se pierde Fullscreen al entrar/salir. -->
+  <section class="screen" id="s-minijuego" aria-hidden="true">
+    <iframe id="cementerio-frame" title="Minijuego Cementerio Sostenible" allow="fullscreen" loading="eager"></iframe>
+  </section>
+
 <script>
   const screens = {
     portada: document.getElementById('s-portada'),
@@ -595,6 +650,7 @@
     resultado: document.getElementById('s-resultado'),
     cartel: document.getElementById('s-cartel'),
     cartel2: document.getElementById('s-cartel2'),
+    minijuego: document.getElementById('s-minijuego'),
   };
 
   const videoPortada = document.getElementById('video-portada');
@@ -639,6 +695,28 @@
   matchVideoRatio(videoPortada, stagePortada);
   matchVideoRatio(videoResultado, stageResultado);
 
+  // Navegación interna desde el iframe. Validamos emisor y origen.
+  const cemeteryFrame = document.getElementById('cementerio-frame');
+  function openMiniGame(){
+    cemeteryFrame.src = 'cementerio-sibille/index.html?embedded=1';
+    goTo('minijuego');
+  }
+  function leaveMiniGame(destination){
+    goTo(destination);
+    // Detiene música, animación y eventos del minijuego ya cerrado.
+    cemeteryFrame.removeAttribute('src');
+  }
+  window.addEventListener('message', (event) => {
+    if (event.source !== cemeteryFrame.contentWindow || event.origin !== location.origin) return;
+    if (event.data?.type !== 'cementerio:navigate') return;
+    if (event.data.destination === 'cartel2') leaveMiniGame('cartel2');
+    else if (event.data.destination === 'portada') {
+      leaveMiniGame('portada');
+      videoPortada.currentTime = 0;
+      videoPortada.play().catch(() => {});
+    }
+  });
+
   function goTo(name){
     Object.values(screens).forEach(s => { s.classList.remove('active'); s.setAttribute('aria-hidden','true'); });
     screens[name].classList.add('active');
@@ -673,8 +751,31 @@
     updateSoundIcon();
   });
 
+  // La interfaz de un navegador móvil solo puede ocultarse a petición del usuario.
+  // Intentarlo dentro del clic conserva la activación requerida por la Fullscreen API.
+  const storyFullscreen = document.getElementById('fullscreen-story');
+  function syncFullscreenButton(){
+    const active = !!document.fullscreenElement;
+    storyFullscreen.textContent = active ? '⛶ Salir de pantalla completa' : '⛶ Pantalla completa';
+    storyFullscreen.setAttribute('aria-label', active ? 'Salir de pantalla completa' : 'Activar pantalla completa');
+  }
+  function enterFullscreen(){
+    if (document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+    document.documentElement.requestFullscreen({navigationUI:'hide'}).catch(() => {
+      // En algunos navegadores el usuario deberá usar el menú del navegador.
+      storyFullscreen.title = 'Usa el menú del navegador si no admite pantalla completa';
+    });
+  }
+  storyFullscreen.addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else enterFullscreen();
+  });
+  document.addEventListener('fullscreenchange', syncFullscreenButton);
+  syncFullscreenButton();
+
   document.getElementById('btn-comenzar').addEventListener('click', (e) => {
     if(calibrating) return; // en modo ajuste el clic coloca el botón, no avanza
+    enterFullscreen(); // solicitar al pulsar Comenzar; no altera la navegación si el navegador lo deniega
     // Primera interacción del usuario: desbloquea el audio del vídeo de portada
     // (se cargó con "muted" para que el navegador permitiera el autoplay inicial).
     videoPortada.muted = false;
@@ -733,7 +834,7 @@
       // Fin del flujo actual del cuento tras el vídeo final.
     } else {
       // Al terminar "Antes del juego" se carga automáticamente el minijuego (cementerio-sibille/index.html)
-      window.location.href = 'cementerio-sibille/index.html';
+      openMiniGame();
     }
   });
 

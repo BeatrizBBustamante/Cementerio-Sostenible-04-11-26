@@ -1,3 +1,15 @@
+/* En modo integrado, pedir navegación a la página principal sin recargarla.
+   En modo independiente, conservar los enlaces originales. */
+function navigateCemetery(destination) {
+  const embedded = new URLSearchParams(location.search).get('embedded') === '1';
+  if (embedded && window.parent !== window) {
+    document.getElementById('graveyard-music')?.pause();
+    window.parent.postMessage({ type: 'cementerio:navigate', destination }, location.origin);
+  } else {
+    window.location.href = destination === 'portada' ? '../index.html' : '../index.html?scene=cartel2';
+  }
+}
+
 'use strict';
 
 /* =========================================================================
@@ -1197,12 +1209,12 @@ class Game {
     // "Volver al inicio" regresa a la portada del proyecto completo (misma navegación
     // que se usó para entrar al minijuego, en sentido inverso).
     this.homeButton.addEventListener('click', () => {
-      window.location.href = '../index.html';
+      navigateCemetery('portada');
     });
     // "Continuar" lleva de vuelta al proyecto principal, indicándole que muestre
     // directamente el cartel posterior al minijuego (misma estética del cuento).
     this.continueButton.addEventListener('click', () => {
-      window.location.href = '../index.html?scene=cartel2';
+      navigateCemetery('cartel2');
     });
 
     // "Saltar juego": disponible durante toda la partida. Cierra el minijuego y
@@ -1210,7 +1222,7 @@ class Game {
     // completado normalmente (misma navegación que el botón "Continuar" de arriba).
     this.skipButton = document.getElementById('skip-button');
     this.skipButton.addEventListener('click', () => {
-      window.location.href = '../index.html?scene=cartel2';
+      navigateCemetery('cartel2');
     });
   }
 
@@ -1535,5 +1547,6 @@ class Game {
 window.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('game-canvas');
   const game = new Game(canvas);
+  window.cemeteryGame = game; // Solo lectura para encuadre móvil; las mecánicas no cambian.
   game.start();
 });

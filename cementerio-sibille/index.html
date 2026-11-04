@@ -2,9 +2,10 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Sibille y el Cementerio Limpio</title>
 <link rel="stylesheet" href="style.css">
+<script>if (new URLSearchParams(location.search).get("embedded") === "1") document.documentElement.classList.add("embedded");</script>
 </head>
 <body>
 
@@ -55,9 +56,24 @@
     </div>
 
     </div><!-- /game-stage -->
+
+    <button id="fullscreen-button" type="button" aria-label="Activar pantalla completa" title="Pantalla completa">⛶ Pantalla completa</button>
+
+    <!-- Controles táctiles independientes de la lógica y gráficos del juego. -->
+    <nav id="mobile-controls" aria-label="Controles de movimiento de Sibille">
+      <div class="direction-pad" aria-label="Cruceta de movimiento">
+        <button class="move-btn move-up" type="button" data-key="arrowup" aria-label="Mover arriba">▲</button>
+        <button class="move-btn move-left" type="button" data-key="arrowleft" aria-label="Mover izquierda">◀</button>
+        <button class="move-btn move-down" type="button" data-key="arrowdown" aria-label="Mover abajo">▼</button>
+        <button class="move-btn move-right" type="button" data-key="arrowright" aria-label="Mover derecha">▶</button>
+      </div>
+      <span class="mobile-controls-hint">Mantén pulsadas las flechas para caminar</span>
+    </nav>
   </div>
 
 <script src="game.js"></script>
 <script src="music.js"></script>
+<script src="touch-controls.js"></script>
+<script src="mobile-layout.js"></script>
 </body>
 </html>

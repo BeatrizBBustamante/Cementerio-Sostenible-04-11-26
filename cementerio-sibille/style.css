@@ -350,3 +350,187 @@ html, body {
 @media (max-width: 700px) {
   #music-toggle { left: 1.5%; bottom: 1.5%; font-size: clamp(8px, 1.5vw, 12px); padding: 4px 7px; }
 }
+
+/* ---------------- Controles móviles, solo cuando hay entrada táctil ---------------- */
+#mobile-controls { display: none; }
+@media (pointer: coarse) {
+  html, body { overscroll-behavior: none; }
+  #game-container { overflow: hidden; }
+  #mobile-controls {
+    display: flex;
+    position: fixed;
+    z-index: 35;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    align-items: center;
+    flex-direction: column;
+    gap: 4px;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .direction-pad {
+    display: grid;
+    grid-template-columns: repeat(3, 48px);
+    grid-template-rows: repeat(3, 48px);
+    gap: 3px;
+    pointer-events: auto;
+    touch-action: none;
+  }
+  .move-btn {
+    border: 2px solid rgba(183,172,130,.85);
+    border-radius: 12px;
+    background: rgba(12,11,8,.78);
+    color: #f3e9c9;
+    font-size: 22px;
+    font-family: sans-serif;
+    touch-action: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .move-btn.pressed { background: rgba(107,97,66,.98); }
+  .move-up { grid-column: 2; grid-row: 1; }
+  .move-left { grid-column: 1; grid-row: 2; }
+  .move-down { grid-column: 2; grid-row: 3; }
+  .move-right { grid-column: 3; grid-row: 2; }
+  .mobile-controls-hint {
+    color: #e9dfc0;
+    background: rgba(12,11,8,.8);
+    border-radius: 5px;
+    padding: 3px 6px;
+    font: 10px 'Cinzel', serif;
+    white-space: nowrap;
+  }
+  #end-screen:not(.hidden) ~ #mobile-controls { display: none; }
+}
+/* En vertical se conserva el escenario apaisado y la cruceta se coloca
+   DEBAJO, nunca cubriendo las ilustraciones ni los cubos de reciclaje. */
+@media (pointer: coarse) and (orientation: portrait) {
+  #game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    padding-top: max(18px, env(safe-area-inset-top));
+  }
+  #game-stage { width: 100vw; max-width: 100vw; max-height: none; }
+  #mobile-controls {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    flex: 0 0 auto;
+    margin-top: 2px;
+  }
+  .direction-pad { grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); }
+  /* Pantallas de carga y final ocupan la pantalla móvil en vez de quedarse
+     comprimidas a una franja dentro del escenario horizontal. */
+  #loading-screen, #end-screen { position: fixed; inset: 0; }
+  #end-box { max-width: 94vw; max-height: 85dvh; overflow-y: auto; padding: 18px 14px; }
+  #end-box h2 { font-size: 28px; }
+  #end-box p { font-size: 13px; }
+  #end-actions button { min-height: 42px; font-size: 11px; }
+  #hud { top: 1%; gap: 6px; }
+  #skip-button { top: 1%; right: 1%; }
+  #music-toggle { left: 1%; bottom: 1%; }
+}
+/* En horizontal la cruceta se muestra sobre el extremo inferior derecho,
+   con fondo translúcido para no ocultar por completo la escena. */
+@media (pointer: coarse) and (orientation: landscape) {
+  .direction-pad {
+    grid-template-columns: repeat(3, min(9.5dvh, 48px));
+    grid-template-rows: repeat(3, min(9.5dvh, 48px));
+  }
+  .mobile-controls-hint { display: none; }
+  #end-box { max-height: 88dvh; }
+  #loading-screen, #end-screen { position: fixed; inset: 0; }
+}
+
+
+/* === Adaptación móvil v2: encuadre y HUD ===
+   En vertical se ve el mapa completo. En horizontal extraancho
+   se amplía proporcionalmente y una cámara vertical acompaña a Sibille.
+   La resolución y coordenadas internas del canvas no cambian. */
+#fullscreen-button { display:none; }
+@media (pointer:coarse) {
+  html,body { width:100%; height:100%; height:100dvh; overflow:hidden; }
+  #game-container { width:100%; height:100dvh; min-height:0; position:relative; }
+  #game-stage { box-shadow:none; }
+  #hud {
+    left:max(8px,env(safe-area-inset-left));
+    top:max(7px,env(safe-area-inset-top));
+    right:auto; transform:none; gap:5px;
+    z-index:25;
+  }
+  .hud-box { min-width:0; padding:3px 6px; border-width:1px; border-radius:5px; }
+  .hud-label { font-size:clamp(7px,1.2dvh,9px); letter-spacing:0; line-height:1.1; }
+  .hud-value { font-size:clamp(12px,2.5dvh,17px); line-height:1.1; }
+  #skip-button {
+    top:max(7px,env(safe-area-inset-top));
+    right:max(8px,env(safe-area-inset-right));
+    font-size:clamp(9px,1.6dvh,11px);
+    padding:6px 8px;
+    z-index:26;
+    border-width:1px;
+    letter-spacing:0;
+  }
+  #music-toggle { left:max(8px,env(safe-area-inset-left));bottom:max(8px,env(safe-area-inset-bottom)); font-size:10px; padding:6px 8px; }
+  #fullscreen-button {
+    position:fixed; display:block; z-index:36;
+    left:50%; bottom:max(8px,env(safe-area-inset-bottom));
+    transform:translateX(-50%);
+    border:1px solid #8a7d4d; border-radius:7px;
+    background:rgba(12,11,8,.82);color:#f3e9c9;
+    font:600 10px 'Cinzel',serif;
+    padding:8px 10px;white-space:nowrap;
+    touch-action:manipulation;
+  }
+  :fullscreen #fullscreen-button { display:none; }
+}
+@media (pointer:coarse) and (orientation:portrait) {
+  /* Barra superior independiente: ni marcadores ni saltar cubren la escena. */
+  #game-container { padding-top:0; gap:12px; }
+  #game-stage { margin-top:54px; width:100vw; max-width:100vw; height:auto; aspect-ratio:1672 / 941; flex:none; }
+  #hud, #skip-button { position:fixed; top:max(8px,env(safe-area-inset-top)); }
+  #hud { gap:4px; }
+  #hud .hud-label { font-size:8px; }
+  #hud .hud-value { font-size:15px; }
+  #skip-button { font-size:9px; padding:7px 5px; }
+  #mobile-controls { margin-top:0; }
+  #music-toggle { position:fixed; bottom:max(8px,env(safe-area-inset-bottom)); }
+  .direction-pad { grid-template-columns:repeat(3,min(14dvw,56px)); grid-template-rows:repeat(3,min(14dvw,56px)); }
+  #fullscreen-button { bottom:max(8px,env(safe-area-inset-bottom)); }
+}
+@media (pointer:coarse) and (orientation:landscape) {
+  /* Ocupa el viewport. En pantallas muy anchas la cámara desplaza el
+     escenario verticalmente sin estirar sprites ni esconder zonas jugables. */
+  #game-container { padding:0; margin:0; display:block; }
+  #game-stage {
+    width:100vw !important; height:100dvh !important;
+    max-width:none !important; max-height:none !important;
+    aspect-ratio:auto !important;
+    overflow:hidden; position:relative;
+  }
+  #game-canvas {
+    position:absolute; left:0; top:0;
+    width:100%; height:auto;
+    max-width:none; max-height:none;
+    box-shadow:none;
+    transform:translate3d(0,var(--camera-y,0px),0);
+    will-change:transform;
+  }
+  #hud { position:fixed; }
+  #skip-button { position:fixed; }
+  #music-toggle { position:fixed; }
+  #mobile-controls { position:fixed; right:max(8px,env(safe-area-inset-right)); bottom:max(7px,env(safe-area-inset-bottom)); }
+  .direction-pad {
+    grid-template-columns:repeat(3,clamp(32px,10dvh,45px));
+    grid-template-rows:repeat(3,clamp(32px,10dvh,45px));
+    gap:2px;
+  }
+  .move-btn {font-size:19px;border-radius:8px;}
+  #fullscreen-button {bottom:max(8px,env(safe-area-inset-bottom));}
+}
+
+/* El padre ya es pantalla completa: evitar botón redundante dentro del iframe. */
+html.embedded #fullscreen-button { display:none !important; }

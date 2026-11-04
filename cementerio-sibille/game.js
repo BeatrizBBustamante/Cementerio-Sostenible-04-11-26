@@ -25,6 +25,7 @@ const WORLD_WIDTH = 1672;
 const WORLD_HEIGHT = 941;
 
 const PLAYER_SPEED = 230;          // píxeles por segundo
+const CARRIED_ICON_SIZE = 42;
 const MAX_UPDATE_STEP = 0.05;
 const MAX_FRAME_TIME = 0.2;
 
@@ -819,19 +820,19 @@ class Player {
 
     // Icono del objeto que lleva encima de la cabeza.
     if (this.carrying && this.carrying.image) {
-      const iconSize = 28;
-      const iconX = this.x - iconSize / 2;
-      const iconY = drawY - iconSize - 6;
+      const radius = CARRIED_ICON_SIZE / 2 + 5;
+      const iconY = Math.max(radius + 1, drawY - CARRIED_ICON_SIZE / 2 - 6);
+      const { image, iconWidth, iconHeight } = this.carrying;
 
       ctx.save();
       ctx.fillStyle = 'rgba(20, 18, 12, 0.55)';
       ctx.beginPath();
-      ctx.ellipse(this.x, iconY + iconSize / 2, iconSize / 2 + 5, iconSize / 2 + 5, 0, 0, Math.PI * 2);
+      ctx.ellipse(this.x, iconY, radius, radius, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = 'rgba(230, 220, 180, 0.8)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.drawImage(this.carrying.image, iconX, iconY, iconSize, iconSize);
+      ctx.drawImage(image, this.x - iconWidth / 2, iconY - iconHeight / 2, iconWidth, iconHeight);
       ctx.restore();
     }
   }
@@ -1199,6 +1200,7 @@ class Game {
 
     this.hudTrashEl = document.getElementById('hud-trash-value');
     this.hudScoreEl = document.getElementById('hud-score-value');
+    this.hintEl = document.getElementById('game-hint');
     this.loadingScreen = document.getElementById('loading-screen');
     this.loadingBar = document.getElementById('loading-bar-fill');
     this.loadingText = document.getElementById('loading-text');
@@ -1419,7 +1421,14 @@ class Game {
       const d = Collision.distance(this.player.x, this.player.y, item.x, item.y);
       if (d < PICKUP_RADIUS) {
         item.collected = true;
-        this.player.carrying = { type: item.type, image: item.image };
+        const iconScale = CARRIED_ICON_SIZE / Math.max(item.w, item.h);
+        this.player.carrying = {
+          type: item.type,
+          image: item.image,
+          iconWidth: item.w * iconScale,
+          iconHeight: item.h * iconScale,
+        };
+        this.updateHint();
         break;
       }
     }
@@ -1526,6 +1535,7 @@ class Game {
 
   win() {
     this.won = true;
+    this.updateHint();
     this.endScoreEl.textContent = `Puntuación final: ${this.score}`;
     this.endScreen.classList.remove('hidden');
   }
@@ -1533,6 +1543,16 @@ class Game {
   updateHUD() {
     this.hudTrashEl.textContent = this.trashRemaining;
     this.hudScoreEl.textContent = this.score;
+    this.updateHint();
+  }
+
+  updateHint() {
+    const message = this.won || this.trashRemaining === 0 ? '' : this.player.carrying
+      ? 'Tíralo en el cubo correspondiente'
+      : 'Recoge algo de basura';
+    if (this.hintEl.textContent === message) return;
+    this.hintEl.textContent = message;
+    this.hintEl.classList.toggle('hidden', !message);
   }
 
   render() {

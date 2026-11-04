@@ -1566,24 +1566,15 @@ class Game {
 
     if (!this.ready) return;
 
-    // Lista de entidades ordenadas por profundidad (coordenada Y).
-    // Se reutiliza el mismo array en cada frame (sólo se vacía con
-    // length = 0, lo que no libera su capacidad interna) y se guardan
-    // referencias directas a los objetos: Obstacle, Item y Player
-    // comparten la firma draw(ctx), así que no hace falta envolverlos en
-    // funciones flecha nuevas cada vez. Antes esto asignaba un array y
-    // hasta ~20 closures nuevas 60 veces por segundo, generando basura
-    // de forma constante durante toda la partida.
+    // Los residuos del suelo quedan detrás de los personajes.
+    for (const item of this.items) item.draw(ctx);
+
+    // Reutiliza la lista ordenada por profundidad para obstáculos y personajes.
     const renderList = this.renderList;
     renderList.length = 0;
 
     for (const obstacle of this.obstacles) {
       renderList.push(obstacle);
-    }
-
-    for (const item of this.items) {
-      if (item.collected) continue;
-      renderList.push(item);
     }
 
     renderList.push(this.player);
